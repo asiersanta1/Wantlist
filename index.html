@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Wantlist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Manrope:wght@600;700;800&display=swap">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand">Wantlist</div>
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <label class="sr" for="q">Buscar productos</label>
+    <input id="q" type="search" placeholder="Buscar por nombre, marca, modelo o tienda" autocomplete="off">
+  </div>
+  <div class="top-actions">
+    <button class="btn" id="btnData" type="button">Copia de seguridad</button>
+    <button class="btn primary add-top" id="btnAdd" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Añadir producto</button>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <div class="demo" id="demoBar" hidden>
+    <span><b>Datos de demostración.</b> Los productos marcados «Demo» tienen nombres, marcas y precios inventados.</span>
+    <span class="demo-actions">
+      <button class="btn small" id="btnClearDemo" type="button">Borrar datos de demostración</button>
+    </span>
+  </div>
+
+  <section class="summary" aria-label="Resumen de la lista" id="summary"></section>
+
+  <div class="main">
+    <nav class="cats" id="cats" aria-label="Categorías"></nav>
+    <section aria-label="Productos">
+      <div class="tools">
+        <div class="sel"><label for="fStatus">Estado</label>
+          <select id="fStatus"></select></div>
+        <div class="sel"><label for="fPrio">Prioridad</label>
+          <select id="fPrio"></select></div>
+        <div class="sel"><label for="fSort">Ordenar por</label>
+          <select id="fSort">
+            <option value="recent">Más recientes</option>
+            <option value="name">Nombre (A–Z)</option>
+            <option value="price-asc">Precio: menor a mayor</option>
+            <option value="price-desc">Precio: mayor a menor</option>
+            <option value="prio">Prioridad</option>
+          </select></div>
+        <button class="btn small" id="btnReset" type="button" hidden style="align-self:flex-end">Limpiar filtros</button>
+        <span class="count" id="count" aria-live="polite"></span>
+      </div>
+      <div class="grid" id="grid"></div>
+      <p class="note">Prototipo visual. Los cambios se guardan solo en este navegador, sin cuenta ni sincronización. En el orden por precio, los productos en euros van primero porque aún no hay tipos de cambio fiables para comparar otras monedas. Las imágenes de las fichas son ilustraciones de muestra; las imágenes por enlace pueden no cargarse en este prototipo.</p>
+    </section>
+  </div>
+</main>
+
+<button class="btn primary fab" id="fab" type="button" aria-label="Añadir producto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Añadir</button>
+
+<!-- Formulario -->
+<dialog id="dlgForm" aria-labelledby="formTitle">
+  <div class="dh"><h2 id="formTitle">Añadir producto</h2><button class="ib" data-close type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <form class="db" id="form" novalidate>
+    <div class="form">
+      <div class="field full"><label for="fUrl">Enlace del producto</label>
+        <input id="fUrl" type="url" inputmode="url" placeholder="https://tienda.com/producto">
+        <small>Pega el enlace y se rellenarán la tienda y el país si se pueden deducir. El nombre, el precio y la imagen no se importan automáticamente.</small><span class="err" id="eUrl"></span></div>
+      <div class="field full"><label for="fName">Nombre *</label><input id="fName" type="text" maxlength="120" required><span class="err" id="eName"></span></div>
+      <div class="field"><label for="fBrand">Marca</label><input id="fBrand" type="text" maxlength="60"></div>
+      <div class="field"><label for="fModel">Modelo o referencia</label><input id="fModel" type="text" maxlength="60"></div>
+      <div class="field"><label for="fStore">Tienda</label><input id="fStore" type="text" maxlength="60"></div>
+      <div class="field"><label for="fCountry">País de la tienda</label><input id="fCountry" type="text" list="countries" maxlength="40">
+        <datalist id="countries"><option value="España"><option value="Malasia"><option value="Reino Unido"><option value="Estados Unidos"><option value="Japón"><option value="Internacional"></datalist></div>
+      <div class="field"><label for="fCat">Categoría</label><select id="fCat"></select></div>
+      <div class="field"><label for="fStatusF">Estado</label><select id="fStatusF"></select></div>
+      <div class="field"><label for="fPrice">Precio actual</label>
+        <div class="pricebox"><input id="fPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0,00"><select id="fCur" aria-label="Moneda"></select></div>
+        <span class="err" id="ePrice"></span></div>
+      <div class="field"><label for="fTarget">Precio objetivo (EUR)</label><input id="fTarget" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"><span class="err" id="eTarget"></span></div>
+      <fieldset class="field full"><legend>Prioridad</legend>
+        <div class="seg" id="fPrioSeg"></div></fieldset>
+      <div class="field full"><label for="fImg">Imagen (enlace)</label><input id="fImg" type="url" inputmode="url" placeholder="https://…/foto.jpg"><small>Opcional. Si no carga, se muestra una ilustración de muestra.</small><span class="err" id="eImg"></span></div>
+      <div class="field full"><label for="fNotes">Notas</label><textarea id="fNotes" maxlength="1000"></textarea></div>
+    </div>
+    <div class="actions"><button class="btn" type="button" data-close>Cancelar</button><button class="btn primary" type="submit" id="btnSave">Guardar producto</button></div>
+  </form>
+</dialog>
+
+<!-- Detalle -->
+<dialog id="dlgDetail" aria-labelledby="detailTitle">
+  <div class="dh"><h2 id="detailTitle">Producto</h2><button class="ib" data-close type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="db" id="detailBody"></div>
+</dialog>
+
+<!-- Cambio de precio -->
+<dialog id="dlgPrice" aria-labelledby="priceTitle" style="width:min(440px,calc(100% - 32px))">
+  <div class="dh"><h2 id="priceTitle">Registrar precio</h2><button class="ib" data-close type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <form class="db" id="priceForm" novalidate>
+    <p id="priceFor" style="margin:0 0 12px;color:var(--muted)"></p>
+    <div class="form" style="grid-template-columns:1fr 1fr">
+      <div class="field"><label for="pAmount">Nuevo precio</label>
+        <div class="pricebox" style="grid-template-columns:1fr 90px"><input id="pAmount" type="number" inputmode="decimal" min="0" step="0.01"><select id="pCur" aria-label="Moneda"></select></div></div>
+      <div class="field"><label for="pDate">Fecha</label><input id="pDate" type="date"></div>
+      <span class="err field full" id="ePAmount" style="color:var(--crit);font-size:12.5px"></span>
+    </div>
+    <div class="actions"><button class="btn" type="button" data-close>Cancelar</button><button class="btn primary" type="submit">Guardar precio</button></div>
+  </form>
+</dialog>
+
+<!-- Copia de seguridad -->
+<dialog id="dlgData" aria-labelledby="dataTitle">
+  <div class="dh"><h2 id="dataTitle">Copia de seguridad</h2><button class="ib" data-close type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="db">
+    <h3 class="sec" style="margin-top:4px">Exportar</h3>
+    <p style="margin:4px 0 8px;color:var(--muted);font-size:13.5px">Copia este texto y guárdalo en un archivo .json. En la app final habrá un botón de descarga; en este prototipo la descarga está bloqueada.</p>
+    <textarea class="code" id="exportBox" readonly aria-label="Copia de seguridad en JSON"></textarea>
+    <div class="actions" style="margin-top:10px"><button class="btn small" id="btnCopy" type="button">Copiar copia</button></div>
+    <h3 class="sec">Importar</h3>
+    <p style="margin:4px 0 8px;color:var(--muted);font-size:13.5px">Pega una copia o elige un archivo .json. Se añaden solo los productos que no existan ya; la lista actual no se borra salvo que lo indiques.</p>
+    <input type="file" id="importFile" accept=".json,application/json" aria-label="Elegir archivo de copia">
+    <textarea class="code" id="importBox" placeholder='{"app":"wantlist", …}' aria-label="Pegar copia de seguridad" style="margin-top:10px"></textarea>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13.5px"><input type="checkbox" id="importReplace"> Reemplazar toda la lista actual</label>
+    <div id="importMsg" aria-live="polite"></div>
+    <div class="actions" style="margin-top:10px"><button class="btn primary" id="btnImport" type="button">Importar</button></div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
