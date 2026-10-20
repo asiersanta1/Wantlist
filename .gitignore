@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+.env.*
+*.local
+# Copias de seguridad con datos personales: nunca al repositorio
+wantlist-*.json
+*.backup.json
