@@ -1,36 +1,54 @@
-// Capa de almacenamiento. HOY: localStorage del navegador (solo este dispositivo).
-// Fase 3-4: este archivo se sustituye por una versión con Cloud Firestore que ofrece las MISMAS funciones,
-// así que la pantalla (main.js) no cambia.
-const KEY = 'wantlist-v1';
-export const SAVE_ERROR = 'No se ha podido guardar el cambio. Comprueba que el navegador permite guardar datos de sitios web e inténtalo de nuevo.';
+// Capa de almacenamiento: Cloud Firestore.
+// Ruta de los datos: users/{uid}/products/{id}  (las reglas de seguridad solo dejan entrar a su dueño).
+// La pantalla (main.js) solo usa `repo`; no sabe nada de Firestore.
+import { collection, doc, setDoc, onSnapshot, writeBatch, getDocs } from 'firebase/firestore';
+import { db } from './firebase.js';
 
-function read() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const a = JSON.parse(raw);
-    return Array.isArray(a) ? a : null;
-  } catch (e) { return null; }
+export const SAVE_ERROR = 'No se ha podido confirmar el guardado. Comprueba tu conexión e inténtalo de nuevo.';
+
+let uid = null;
+const col = () => collection(db, 'users', uid, 'products');
+
+// Firestore no admite valores `undefined`; las notas deben ser siempre texto (lo exigen las reglas).
+function clean(p) {
+  const o = JSON.parse(JSON.stringify(p));
+  o.notes = typeof o.notes === 'string' ? o.notes : '';
+  o.userId = uid;
+  return o;
 }
-function write(list) {
-  // Si falla, lanza error para que la pantalla no diga «guardado» sin estarlo.
-  localStorage.setItem(KEY, JSON.stringify(list));
-  if (localStorage.getItem(KEY) === null) throw new Error('write failed');
+// Si la escritura no se confirma a tiempo, se avisa de error en vez de decir «guardado».
+function confirmed(promise, ms = 12000) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+}
+async function batched(ops) {
+  for (let i = 0; i < ops.length; i += 400) {
+    const batch = writeBatch(db);
+    ops.slice(i, i + 400).forEach((op) => op(batch));
+    await confirmed(batch.commit());
+  }
 }
 
 export const repo = {
-  async loadAll() { return read(); },                       // null = todavía no hay nada guardado
-  async upsert(p) {
-    const list = read() || [];
-    const i = list.findIndex((x) => x.id === p.id);
-    if (i >= 0) list[i] = p; else list.unshift(p);
-    write(list);
+  // Escucha la lista en tiempo real. Devuelve la función para dejar de escuchar.
+  watch(userId, onData, onError) {
+    uid = userId;
+    return onSnapshot(
+      col(),
+      { includeMetadataChanges: true },
+      (snap) => onData(snap.docs.map((d) => d.data()), { pending: snap.metadata.hasPendingWrites, fromCache: snap.metadata.fromCache }),
+      (err) => onError(err),
+    );
   },
-  async upsertMany(items) {
-    const list = read() || [];
-    items.forEach((p) => { const i = list.findIndex((x) => x.id === p.id); if (i >= 0) list[i] = p; else list.push(p); });
-    write(list);
+  stop() { uid = null; },
+  async upsert(p) { await confirmed(setDoc(doc(col(), p.id), clean(p))); },
+  async upsertMany(items) { await batched(items.map((p) => (b) => b.set(doc(col(), p.id), clean(p)))); },
+  async removeMany(ids) { await batched(ids.map((id) => (b) => b.delete(doc(col(), id)))); },
+  async replaceAll(items) {
+    const keep = new Set(items.map((p) => p.id));
+    const existing = await confirmed(getDocs(col()));
+    const ops = [];
+    existing.forEach((d) => { if (!keep.has(d.id)) ops.push((b) => b.delete(d.ref)); });
+    items.forEach((p) => ops.push((b) => b.set(doc(col(), p.id), clean(p))));
+    await batched(ops);
   },
-  async removeMany(ids) { write((read() || []).filter((x) => !ids.includes(x.id))); },
-  async replaceAll(items) { write(items); },
 };

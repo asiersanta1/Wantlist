@@ -6,10 +6,12 @@ import { art, imgTag } from './art.js';
 import { isPending, atGoal, lastDelta } from './calc.js';
 import { validateImport } from './importer.js';
 import { repo, SAVE_ERROR } from './storage.js';
+import { onUser, signInGoogle, signOutUser, authErrorMessage } from './auth.js';
 
 /* ---------- estado ---------- */
 var products=[];
 var f={q:'',cat:'all',status:'active',prio:'all',sort:'recent'};
+var loaded=false,loadError='',stopWatch=null;
 var editingId=null,priceId=null,detailId=null,delArmed=null,toastT=null;
 
 function toast(t){var el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){el.hidden=true},2600)}
@@ -26,14 +28,51 @@ async function removeMany(ids,msg){
   products=products.filter(function(x){return ids.indexOf(x.id)<0});
   render();if(msg)toast(msg);return true;
 }
-async function boot(){
-  try{
-    var list=await repo.loadAll();
-    if(list){products=list}
-    else{products=demo();await repo.replaceAll(products)}
-  }catch(e){products=demo();toast('No se pudo leer lo guardado. Se muestran los datos de demostración.')}
-  render();
+/* ---------- sesión y sincronización ---------- */
+function showSync(meta){
+  var el=$('#sync');if(!el)return;
+  if(!meta){el.textContent='';return}
+  var off=meta.fromCache&&!navigator.onLine;
+  el.className='sync'+(off?' offline':(meta.pending?' pending':''));
+  el.textContent=off?'Sin conexión':(meta.pending?'Guardando…':'Sincronizado');
 }
+function startSession(user){
+  $('#login').hidden=true;$('#app').hidden=false;
+  loaded=false;loadError='';products=[];render();
+  stopWatch=repo.watch(user.uid,function(list,meta){
+    products=list;loaded=true;loadError='';render();showSync(meta);
+  },function(err){
+    loaded=true;loadError=(err&&err.code==='permission-denied')
+      ?'Firestore ha rechazado el acceso. Revisa que las reglas de seguridad estén publicadas.'
+      :'No se ha podido cargar tu lista. Comprueba tu conexión y recarga la página.';
+    render();showSync(null);
+  });
+}
+function endSession(){
+  if(stopWatch){stopWatch();stopWatch=null}
+  repo.stop();products=[];loaded=false;
+  $('#app').hidden=true;$('#login').hidden=false;
+  document.querySelectorAll('dialog[open]').forEach(function(d){d.close()});
+}
+async function boot(){
+  onUser(function(user){if(user)startSession(user);else endSession()});
+}
+$('#btnLogin').addEventListener('click',async function(){
+  var b=this,err=$('#loginErr');err.textContent='';b.disabled=true;
+  try{await signInGoogle()}catch(e){err.textContent=authErrorMessage(e)}
+  b.disabled=false;
+});
+$('#btnLogout').addEventListener('click',function(){signOutUser().catch(function(){toast('No se ha podido cerrar la sesión. Inténtalo de nuevo.')})});
+$('#btnDownload').addEventListener('click',function(){
+  try{
+    var blob=new Blob([exportJson()],{type:'application/json'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='wantlist-'+todayISO()+'.json';
+    document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},1000);
+    toast('Archivo descargado');
+  }catch(e){toast('No se ha podido descargar. Usa «Copiar texto» y guárdalo en un archivo .json.')}
+});
+window.addEventListener('online',function(){showSync({pending:false,fromCache:false})});
+window.addEventListener('offline',function(){showSync({pending:false,fromCache:true})});
 
 function matches(p,skipCat){
   if(!skipCat&&f.cat!=='all'&&p.category!==f.cat)return false;
@@ -123,10 +162,12 @@ function renderGrid(){
   var active=f.q||f.cat!=='all'||f.status!=='active'||f.prio!=='all';
   $('#btnReset').hidden=!active;
   $('#count').textContent=list.length+(list.length===1?' producto':' productos');
+  if(!loaded){$('#count').textContent='';$('#grid').innerHTML='<div class="loading" role="status">Cargando tu lista…</div>';return}
+  if(loadError){$('#count').textContent='';$('#grid').innerHTML='<div class="empty"><h3>No se pudo cargar</h3><p>'+esc(loadError)+'</p></div>';return}
   if(!list.length){
     $('#grid').innerHTML= products.length?
       '<div class="empty"><h3>Ningún producto coincide</h3><p>Prueba con otra búsqueda o quita algún filtro para ver más productos.</p><button class="btn" type="button" data-act="reset">Limpiar filtros</button></div>':
-      '<div class="empty"><h3>Tu lista está vacía</h3><p>Añade el primer producto pegando su enlace o rellenando los datos a mano.</p><button class="btn primary" type="button" data-act="add">Añadir producto</button></div>';
+      '<div class="empty"><h3>Tu lista está vacía</h3><p>Añade el primer producto pegando su enlace o rellenando los datos a mano.</p><button class="btn primary" type="button" data-act="add">Añadir producto</button><button class="btn small" type="button" data-act="load-demo">Cargar ejemplos de demostración</button></div>';
     return;
   }
   $('#grid').innerHTML=list.map(card).join('');
@@ -340,6 +381,7 @@ document.addEventListener('click',function(e){
   else if(a==='del'){delArmed=id;renderDetail(id)}
   else if(a==='del-no'){delArmed=null;renderDetail(detailId)}
   else if(a==='del-yes'){delArmed=null;removeMany([id],'Producto eliminado').then(function(ok){if(ok)dlgDetail.close()})}
+  else if(a==='load-demo'){repo.upsertMany(demo()).then(function(){toast('Ejemplos cargados. Están marcados como «Demo»')}).catch(function(){toast(SAVE_ERROR)})}
   else if(a==='reset')resetFilters();
 });
 function resetFilters(){f={q:'',cat:'all',status:'active',prio:'all',sort:f.sort};$('#q').value='';$('#fStatus').value='active';$('#fPrio').value='all';render()}
