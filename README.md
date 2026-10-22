@@ -2,8 +2,8 @@
 
 Aplicación web personal para guardar y organizar los productos que quiero comprar.
 
-**Estado actual (fase 2):** interfaz completa con datos guardados solo en el navegador (localStorage).
-Todavía NO hay cuenta, base de datos online ni sincronización entre dispositivos.
+**Estado actual (fase 5):** interfaz conectada a Firebase (inicio de sesión con Google y Cloud Firestore).
+Pendiente: publicar en GitHub Pages, autorizar el dominio en Firebase y pruebas de aceptación (fase 6 y 7).
 
 ## Estructura
 
@@ -16,7 +16,9 @@ Todavía NO hay cuenta, base de datos online ni sincronización entre dispositiv
 | `src/art.js` | Ilustraciones de muestra de las tarjetas |
 | `src/demo.js` | Datos de demostración (inventados, marcados «Demo») |
 | `src/importer.js` | Validación de copias de seguridad JSON |
-| `src/storage.js` | **Único** archivo que guarda y lee datos. En la fase 3-4 se sustituye por Firestore |
+| `src/storage.js` | **Único** archivo que guarda y lee datos (Cloud Firestore, ruta `users/{uid}/products/{id}`) |
+| `src/firebase.js` | Configuración pública del proyecto Firebase |
+| `src/auth.js` | Inicio y cierre de sesión con Google |
 | `src/main.js` | Pantalla e interacciones |
 | `.github/workflows/deploy.yml` | Publicación automática en GitHub Pages (fase 6) |
 
